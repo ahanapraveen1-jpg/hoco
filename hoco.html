@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Homecoming Checkout</title>
+
+<!-- Confetti -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background:#1d1d1d;
+    font-family:monospace;
+    padding:20px;
+}
+
+.terminal{
+    width:clamp(350px,60vw,700px);
+    background:#2b2b2b;
+    border-radius:20px;
+    padding:25px;
+    box-shadow:0 0 40px rgba(0,0,0,.5);
+}
+
+.screen{
+    background:#101010;
+    color:#00ff66;
+    border:2px solid #00ff66;
+    border-radius:10px;
+    padding:20px;
+}
+
+h2{
+    margin-top:0;
+    text-align:center;
+}
+
+.line{
+    display:flex;
+    justify-content:space-between;
+    margin:10px 0;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    margin-top:20px;
+    border:none;
+    border-radius:8px;
+    font-size:18px;
+    cursor:pointer;
+    background:#00aa44;
+    color:white;
+}
+
+button:hover{
+    background:#00cc55;
+}
+
+.loading{
+    display:none;
+    text-align:center;
+}
+
+.printer-slot{
+    height:12px;
+    width:80%;
+    margin:20px auto 0;
+    background:#111;
+    border-radius:10px;
+}
+
+/* =========================
+   RECEIPT
+========================= */
+
+#receipt{
+    display:none;
+    background:white;
+    color:black;
+
+    width:min(90%,420px);
+
+    margin:0 auto;
+    text-align:center;
+
+    overflow:hidden;
+    max-height:0;
+
+    transition:max-height 12s linear;
+
+    white-space:pre-wrap;
+    padding:0 20px;
+
+    font-family:"Courier New", monospace;
+}
+
+.receipt-btn{
+    width:100%;
+    background:black;
+    color:white;
+}
+
+.final-receipt{
+    width:100%;
+    text-align:center;
+    line-height:1.8;
+}
+
+
+/* =========================
+   ADS
+========================= */
+
+#adContainer{
+    margin-top:20px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.ad{
+    position:relative;
+
+    background:#f5f5f5;
+    color:#111;
+
+    border:2px solid #555;
+    border-radius:8px;
+
+    padding:18px 35px 18px 18px;
+
+    text-align:center;
+
+    font-family:Arial, sans-serif;
+
+    box-shadow:0 3px 8px rgba(0,0,0,.4);
+
+    animation:adAppear .25s ease-out;
+}
+
+.ad-title{
+    font-weight:bold;
+    font-size:16px;
+    margin-bottom:10px;
+}
+
+.ad-text{
+    font-size:14px;
+    line-height:1.5;
+}
+
+.closeAd{
+    position:absolute;
+
+    top:7px;
+    right:10px;
+
+    width:24px;
+    height:24px;
+
+    background:#ddd;
+    color:#222;
+
+    border-radius:4px;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    font-family:Arial,sans-serif;
+    font-weight:bold;
+    font-size:14px;
+
+    cursor:pointer;
+}
+
+.closeAd:hover{
+    background:#bbb;
+}
+
+#adStatus{
+    margin-top:15px;
+    font-size:13px;
+    color:#00ff66;
+}
+
+@keyframes adAppear{
+
+    from{
+        opacity:0;
+        transform:scale(.9);
+    }
+
+    to{
+        opacity:1;
+        transform:scale(1);
+    }
+
+}
+
+
+/* =========================
+   PRINT
+========================= */
+
+@media print{
+
+    body{
+        background:white;
+    }
+
+    .terminal{
+        background:white;
+        box-shadow:none;
+    }
+
+    .screen,
+    .printer-slot{
+        display:none;
+    }
+
+    #receipt{
+        display:block !important;
+        max-height:none !important;
+        width:100%;
+    }
+
+    button{
+        display:none;
+    }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="terminal">
+
+
+    <!-- =========================
+         CHECKOUT SCREEN
+    ========================== -->
+
+    <div class="screen" id="checkout">
+
+        <h2>SELF CHECKOUT</h2>
+
+        <div class="line">
+            <span>Item</span>
+            <span>Homecoming Date 2026</span>
+        </div>
+
+        <div class="line">
+            <span>Qty</span>
+            <span>1</span>
+        </div>
+
+        <div class="line">
+            <span>Price</span>
+            <span>$0.00</span>
+        </div>
+
+        <hr>
+
+        <div class="line">
+            <span>Total</span>
+            <span>$0.00</span>
+        </div>
+
+        <p>
+            Ready to complete purchase.
+        </p>
+
+        <button onclick="pay()">
+            PAY $0.00
+        </button>
+
+    </div>
+
+
+    <!-- =========================
+         PAYMENT / ADS SCREEN
+    ========================== -->
+
+    <div class="screen loading" id="loading">
+
+        <h3>PAYMENT TERMINAL</h3>
+
+        <p id="progress">
+            Connecting...
+        </p>
+
+        <div id="adContainer"></div>
+
+        <div id="adStatus"></div>
+
+    </div>
+
+
+    <!-- =========================
+         PRINTER
+    ========================== -->
+
+    <div class="printer-slot"></div>
+
+
+    <!-- =========================
+         RECEIPT
+    ========================== -->
+
+    <div id="receipt"></div>
+
+
+</div>
+
+
+<script>
+
+
+/* =========================================================
+   RANDOM ADS
+========================================================= */
+
+const ads = [
+
+`
+<div class="ad-title">
+EXTENDED WARRANTY
+</div>
+
+<div class="ad-text">
+Protect your Homecoming experience.<br><br>
+Covers awkward silences and questionable dance moves.
+</div>
+`,
+
+`
+<div class="ad-title">
+MEMORY PACKAGE
+</div>
+
+<div class="ad-text">
+Includes photos, memories, and fun.<br><br>
+Price: Included.
+</div>
+`,
+
+`
+<div class="ad-title">
+CUSTOMER REVIEW
+</div>
+
+<div class="ad-text">
+★★★★★<br><br>
+"Would attend again."
+</div>
+`,
+
+`
+<div class="ad-title">
+TRACKING UPDATE
+</div>
+
+<div class="ad-text">
+Homecoming Night<br><br>
+Status: Out For Delivery.
+</div>
+`,
+
+`
+<div class="ad-title">
+HOMECOMING REWARDS
+</div>
+
+<div class="ad-text">
+Current Balance:<br><br>
+9,999 Points
+</div>
+`,
+
+`
+<div class="ad-title">
+DIGITAL COUPON
+</div>
+
+<div class="ad-text">
+Redeem for one extra fun evening.<br><br>
+Expires: Homecoming Night
+</div>
+`,
+
+`
+<div class="ad-title">
+IMPORTANT NOTICE
+</div>
+
+<div class="ad-text">
+Customer selected for a complimentary surprise.
+</div>
+`,
+
+`
+<div class="ad-title">
+SPONSORED MESSAGE
+</div>
+
+<div class="ad-text">
+The Dance Floor appreciates your business.
+</div>
+`,
+
+`
+<div class="ad-title">
+RECEIPT PREFERENCE
+</div>
+
+<div class="ad-text">
+Would you like a receipt?<br><br>
+Too bad. You're getting one anyway.
+</div>
+`,
+
+`
+<div class="ad-title">
+CUSTOMER SURVEY
+</div>
+
+<div class="ad-text">
+Your opinion matters to us.<br><br>
+Thank you for your patience.
+</div>
+`,
+
+`
+<div class="ad-title">
+SPECIAL OFFER
+</div>
+
+<div class="ad-text">
+Upgrade your current purchase<br>
+from "Going Alone"<br>
+to "Going Together."
+</div>
+`
+
+];
+
+
+/* =========================================================
+   GET 5 RANDOM ADS
+========================================================= */
+
+function getRandomAds(count){
+
+    const shuffled = [...ads];
+
+    shuffled.sort(() => Math.random() - 0.5);
+
+    return shuffled.slice(0,count);
+
+}
+
+
+/* =========================================================
+   SHOW ADS
+========================================================= */
+
+function showAds(){
+
+    const container =
+        document.getElementById("adContainer");
+
+    const status =
+        document.getElementById("adStatus");
+
+    container.innerHTML = "";
+
+    status.innerHTML =
+        "Additional verification required.<br>" +
+        "Please close all advertisements to continue.";
+
+    const selectedAds = getRandomAds(5);
+
+    selectedAds.forEach((ad, index) => {
+
+        const div = document.createElement("div");
+
+        div.className = "ad";
+
+        div.innerHTML = `
+            <span class="closeAd">✕</span>
+            ${ad}
+        `;
+
+        const closeButton =
+            div.querySelector(".closeAd");
+
+        closeButton.addEventListener("click", function(){
+
+            div.remove();
+
+            const remaining =
+                document.querySelectorAll(".ad").length;
+
+            if(remaining > 0){
+
+                status.innerHTML =
+                    "Advertisement closed ✓<br>" +
+                    remaining +
+                    " remaining...";
+
+            }
+
+            else{
+
+                status.innerHTML =
+                    "All advertisements closed ✓<br>" +
+                    "Resuming transaction...";
+
+                setTimeout(showReceipt,1200);
+
+            }
+
+        });
+
+        container.appendChild(div);
+
+    });
+
+}
+
+
+/* =========================================================
+   PAYMENT
+========================================================= */
+
+function pay(){
+
+    document.getElementById("checkout").style.display="none";
+
+    document.getElementById("loading").style.display="block";
+
+    let percent = 0;
+
+    const interval = setInterval(() => {
+
+        percent += 4;
+
+        document.getElementById("progress").innerHTML =
+            "Processing Payment... " + percent + "%";
+
+        if(percent >= 100){
+
+            clearInterval(interval);
+
+            document.getElementById("progress").innerHTML =
+                "Payment processing complete.";
+
+            setTimeout(showAds,800);
+
+        }
+
+    },120);
+
+}
+
+
+/* =========================================================
+   LONG RECEIPT
+========================================================= */
+
+function showReceipt(){
+
+    document.getElementById("loading").style.display="none";
+
+    const receipt =
+        document.getElementById("receipt");
+
+    receipt.innerHTML = `
+
+<div style="text-align:center;">
+
+================================
+SELF CHECKOUT RECEIPT
+================================
+
+STORE:
+Homecoming Services
+
+DATE:
+October 2026
+
+--------------------------------
+
+ITEM
+
+AHANA takes you to Homecoming
+
+QTY.......................1
+
+PRICE.................$0.00
+
+--------------------------------
+
+SUBTOTAL..............$0.00
+
+TAX...................$0.00
+
+TOTAL.................$0.00
+
+--------------------------------
+
+PAYMENT METHOD
+
+GIRLFRIEND Points
+
+STATUS
+
+APPROVED
+
+AUTH CODE
+
+PLS-SAY-YES
+
+================================
+
+COUPONS
+
+SAVE $5.00
+ON CANDY
+
+SAVE $10.00
+ON STUFFED ANIMALS
+
+================================
+
+RETURN POLICY
+
+No take-backs.
+
+================================
+
+MANAGER OVERRIDE REQUIRED
+
+Reason:
+
+Asking Someone To Homecoming
+
+================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+FINAL OFFER
+
+One (1) Homecoming Date
+
+Redeemable With:
+
+AHANA PRAVEEN
+
+================================
+
+Dear ANUVA DIXIT,
+
+You have been selected
+to receive this special offer.
+
+Would you like to attend
+Homecoming with me?
+
+================================
+
+<button class="receipt-btn"
+onclick="acceptOffer()">
+ACCEPT OFFER
+</button>
+
+</div>
+
+`;
+
+    receipt.style.display = "block";
+
+    receipt.style.margin = "0 auto";
+
+    receipt.style.textAlign = "center";
+
+
+    setTimeout(() => {
+
+        receipt.style.maxHeight = "5000px";
+
+    },50);
+
+}
+
+
+/* =========================================================
+   ACCEPT OFFER + CONFETTI
+========================================================= */
+
+function acceptOffer(){
+
+    /* CONFETTI */
+
+    confetti({
+        particleCount:200,
+        spread:120,
+        origin:{ y:0.6 }
+    });
+
+
+    /* SECOND CONFETTI BURST */
+
+    setTimeout(() => {
+
+        confetti({
+            particleCount:150,
+            spread:100,
+            origin:{ x:0, y:0.6 }
+        });
+
+        confetti({
+            particleCount:150,
+            spread:100,
+            origin:{ x:1, y:0.6 }
+        });
+
+    },300);
+
+
+    const receipt =
+        document.getElementById("receipt");
+
+
+    receipt.style.maxHeight = "none";
+
+
+    receipt.style.width = "100%";
+
+    receipt.style.margin = "0 auto";
+
+    receipt.style.textAlign = "center";
+
+
+    receipt.innerHTML = `
+
+<div class="final-receipt">
+
+================================
+RECEIPT COPY
+================================
+
+TRANSACTION COMPLETE
+
+STATUS
+
+APPROVED ✓
+
+CUSTOMER
+
+ANUVA DIXIT
+
+PRODUCT
+
+One Homecoming Date
+
+PRICE
+
+$0.00
+
+AUTHORIZATION
+
+YAYYY-YOU-SAID-YES
+
+================================
+
+THANK YOU FOR SHOPPING
+AT HOMECOMING SERVICES™
+
+CUSTOMER NOTICE
+
+Please bring this receipt
+to AHANA PRAVEEN to claim
+your complimentary surprise.
+
+Offer valid while supplies last.
+
+See cashier for details.
+
+================================
+
+Thank you for your purchase.
+
+See you at Homecoming.
+
+================================
+
+<button class="receipt-btn"
+onclick="window.print()">
+PRINT RECEIPT
+</button>
+
+</div>
+
+`;
+
+}
+
+</script>
+
+</body>
+
+</html>
